@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['test_login'])) {
         WHERE email = :email 
         LIMIT 1
     ");
-    $db->bind(':email', 'test@student.edu');
+    $db->bind(':email', 'student@test.edu');
     $test_user = $db->single();
     
     if ($test_user) {
