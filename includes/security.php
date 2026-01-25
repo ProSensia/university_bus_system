@@ -67,8 +67,7 @@ class Security
             AND ip_address = :ip 
             AND timestamp > :time_ago
         ");
-        $this->db->bind(':event_type', $type . '_ATTEMPT');
-        $this->db->bind(':action', $type . '_attempt');
+        $this->db->bind(':event_type', strtoupper($type) . '_ATTEMPT'); 
         $this->db->bind(':ip', $ip);
         $this->db->bind(':time_ago', date('Y-m-d H:i:s', $time_ago));
 
