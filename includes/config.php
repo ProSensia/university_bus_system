@@ -32,7 +32,7 @@ define('ALLOWED_IMAGE_TYPES', ['image/jpeg', 'image/jpg', 'image/png', 'image/gi
 
 // Database Configuration
 define('DB_HOST', 'premium281.web-hosting.com');
-define('DB_NAME', 'prosdfwo_bus-8-pak-austria-v1');
+define('DB_NAME', 'prosdfwo_bus8-pak-austria-V1');
 define('DB_USER', 'prosdfwo_bus8-pak-austria-v1');
 define('DB_PASS', 'Bus8PakAustriaV1');
 define('DB_CHARSET', 'utf8mb4');
