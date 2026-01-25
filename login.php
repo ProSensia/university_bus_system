@@ -26,6 +26,38 @@ if ($security->checkBruteForce($identifier, 'login')) {
     $security->logSecurityEvent('BRUTE_FORCE_BLOCKED', 'Login attempts exceeded for IP: ' . $ip);
 }
 
+// Handle test login (for development/testing only)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['test_login'])) {
+    // Get test user from database
+    $db->prepare("
+        SELECT id, email, role_id, username 
+        FROM users 
+        WHERE email = :email 
+        LIMIT 1
+    ");
+    $db->bind(':email', 'test@student.edu');
+    $test_user = $db->single();
+    
+    if ($test_user) {
+        // Set session for test user
+        $_SESSION['user_id'] = $test_user['id'];
+        $_SESSION['email'] = $test_user['email'];
+        $_SESSION['role_id'] = $test_user['role_id'];
+        $_SESSION['username'] = $test_user['username'];
+        $_SESSION['login_time'] = time();
+        $_SESSION['user_agent'] = $_SERVER['HTTP_USER_AGENT'];
+        $_SESSION['ip_address'] = $ip;
+        
+        // Log test login
+        $security->logSecurityEvent('TEST_LOGIN_USED', 'Test login accessed from IP: ' . $ip);
+        
+        // Redirect to student dashboard
+        $functions->redirect('dashboard/student/', 'Welcome! You are logged in as a test student.', 'info');
+    } else {
+        $error = "Test account not found. Please create test@student.edu account first.";
+    }
+}
+
 // Handle login form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
     // Validate CSRF token
@@ -453,6 +485,17 @@ $csrf_token = $security->generateCSRFToken('login');
                         <a href="register.php" class="fw-bold">Register here</a>
                     </p>
                 </div>
+            </form>
+
+            <!-- TEST LOGIN (Development Only) -->
+            <hr class="my-4">
+            <div class="alert alert-info mb-3">
+                <i class="fas fa-flask me-2"></i> <strong>Quick Test:</strong> Click below to test the student dashboard
+            </div>
+            <form method="POST" action="">
+                <button type="submit" name="test_login" class="btn btn-outline-primary w-100">
+                    <i class="fas fa-user-graduate me-2"></i> Test Student Login
+                </button>
             </form>
             
             <div class="security-notice">
