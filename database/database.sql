@@ -249,7 +249,6 @@ CREATE TABLE `buses` (
   `available_seats` int(11) NOT NULL DEFAULT 0,
   `driver_id` int(11) DEFAULT NULL,
   `conductor_id` int(11) DEFAULT NULL,
-  `route_id` int(11) DEFAULT NULL,
   `photo` varchar(255) DEFAULT NULL,
   `status` enum('active','maintenance','inactive') NOT NULL DEFAULT 'active',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -259,7 +258,6 @@ CREATE TABLE `buses` (
   KEY `campus_id` (`campus_id`),
   KEY `driver_id` (`driver_id`),
   KEY `conductor_id` (`conductor_id`),
-  KEY `route_id` (`route_id`),
   CONSTRAINT `fk_buses_campus_id` FOREIGN KEY (`campus_id`) REFERENCES `campuses` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_buses_conductor_id` FOREIGN KEY (`conductor_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_buses_driver_id` FOREIGN KEY (`driver_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
@@ -381,6 +379,33 @@ CREATE TABLE `fee_structures` (
   PRIMARY KEY (`id`),
   KEY `bus_id` (`bus_id`),
   CONSTRAINT `fk_fee_structures_bus_id` FOREIGN KEY (`bus_id`) REFERENCES `buses` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `fees`
+--
+
+CREATE TABLE `fees` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `student_id` int(11) NOT NULL,
+  `fee_structure_id` int(11) NOT NULL,
+  `amount` decimal(10,2) NOT NULL,
+  `due_date` date NOT NULL,
+  `paid_date` date DEFAULT NULL,
+  `payment_method` enum('cash','bank_transfer','online','other') DEFAULT NULL,
+  `transaction_id` varchar(100) DEFAULT NULL,
+  `status` enum('pending','paid','overdue','cancelled') NOT NULL DEFAULT 'pending',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `student_id` (`student_id`),
+  KEY `fee_structure_id` (`fee_structure_id`),
+  KEY `due_date` (`due_date`),
+  KEY `status` (`status`),
+  CONSTRAINT `fk_fees_student_id` FOREIGN KEY (`student_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_fees_fee_structure_id` FOREIGN KEY (`fee_structure_id`) REFERENCES `fee_structures` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -585,9 +610,6 @@ DELIMITER ;
 
 ALTER TABLE `users`
   ADD CONSTRAINT `fk_users_role_id` FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`) ON DELETE RESTRICT;
-
-ALTER TABLE `buses`
-  ADD CONSTRAINT `fk_buses_route_id` FOREIGN KEY (`route_id`) REFERENCES `bus_routes` (`id`) ON DELETE SET NULL;
 
 -- --------------------------------------------------------
 
