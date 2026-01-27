@@ -284,23 +284,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_excel'])) {
 }
 
 // Handle voucher verification
-// Handle voucher verification - FIXED VERSION
-// Handle voucher verification - FIXED VERSION
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Check which button was clicked
-    if (isset($_POST['approve_voucher'])) {
-        $action = 'approve';
-        $voucher_id = isset($_POST['voucher_id']) ? $_POST['voucher_id'] : '';
-        $admin_notes = isset($_POST['admin_notes']) ? trim($_POST['admin_notes']) : '';
-    } elseif (isset($_POST['reject_voucher'])) {
-        $action = 'reject';
-        $voucher_id = isset($_POST['voucher_id']) ? $_POST['voucher_id'] : '';
-        $admin_notes = isset($_POST['admin_notes']) ? trim($_POST['admin_notes']) : '';
-    } else {
-        $action = '';
-    }
+// Handle voucher verification - SIMPLE FIX
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_voucher'])) {
+    $action = $_POST['verify_voucher']; // This will be 'approve' or 'reject'
+    $voucher_id = isset($_POST['voucher_id']) ? $_POST['voucher_id'] : '';
+    $admin_notes = isset($_POST['admin_notes']) ? trim($_POST['admin_notes']) : '';
 
-    if (!empty($voucher_id) && !empty($action) && (isset($_POST['approve_voucher']) || isset($_POST['reject_voucher']))) {
+    if (!empty($voucher_id) && !empty($action)) {
         // Start transaction
         $conn->begin_transaction();
 
@@ -334,8 +324,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                             // Update fee payment
                             $fee_sql = "INSERT INTO fee_payments (student_id, month_id, status) 
-                                   VALUES (?, ?, 'Submitted') 
-                                   ON DUPLICATE KEY UPDATE status = 'Submitted'";
+                                       VALUES (?, ?, 'Submitted') 
+                                       ON DUPLICATE KEY UPDATE status = 'Submitted'";
                             $fee_stmt = $conn->prepare($fee_sql);
                             $fee_stmt->bind_param("ii", $voucher['student_id'], $month_id);
                             $fee_stmt->execute();
@@ -384,6 +374,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $voucher_stmt->close();
             $conn->commit();
+
         } catch (Exception $e) {
             $conn->rollback();
             $action_message = "Error: " . $e->getMessage();
@@ -1384,18 +1375,17 @@ $pending_count = $pending_count_result->fetch_assoc()['count'];
                                                         placeholder="Add notes..." rows="2"></textarea>
 
                                                     <div class="btn-group btn-group-sm">
-                                                        <button type="submit" name="approve_voucher" value="1"
+                                                        <button type="submit" name="verify_voucher" value="approve"
                                                             class="btn btn-success"
                                                             onclick="return confirmVoucherAction(this)">
                                                             <i class="fas fa-check"></i> Approve
                                                         </button>
-                                                        <button type="submit" name="reject_voucher" value="1"
+                                                        <button type="submit" name="verify_voucher" value="reject"
                                                             class="btn btn-danger"
                                                             onclick="return confirmVoucherAction(this)">
                                                             <i class="fas fa-times"></i> Reject
                                                         </button>
                                                     </div>
-                                                    <input type="hidden" name="verify_voucher" value="1">
                                                 </form>
                                             </td>
                                         </tr>
@@ -2029,8 +2019,9 @@ $pending_count = $pending_count_result->fetch_assoc()['count'];
         });
 
         // Confirm voucher action
+        // Confirm voucher action
         function confirmVoucherAction(button) {
-            const action = button.name === 'approve_voucher' ? 'approve' : 'reject';
+            const action = button.value;
             const confirmMsg = action === 'approve'
                 ? 'Are you sure you want to APPROVE this voucher? This will update fee status to "Submitted".'
                 : 'Are you sure you want to REJECT this voucher?';
