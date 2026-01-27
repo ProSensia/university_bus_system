@@ -285,13 +285,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_excel'])) {
 
 // Handle voucher verification
 // Handle voucher verification - FIXED VERSION
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_voucher'])) {
+// Handle voucher verification - FIXED VERSION
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Check which button was clicked
-    $action = isset($_POST['action']) ? $_POST['action'] : '';
-    $voucher_id = isset($_POST['voucher_id']) ? $_POST['voucher_id'] : '';
-    $admin_notes = isset($_POST['admin_notes']) ? trim($_POST['admin_notes']) : '';
+    if (isset($_POST['approve_voucher'])) {
+        $action = 'approve';
+        $voucher_id = isset($_POST['voucher_id']) ? $_POST['voucher_id'] : '';
+        $admin_notes = isset($_POST['admin_notes']) ? trim($_POST['admin_notes']) : '';
+    } elseif (isset($_POST['reject_voucher'])) {
+        $action = 'reject';
+        $voucher_id = isset($_POST['voucher_id']) ? $_POST['voucher_id'] : '';
+        $admin_notes = isset($_POST['admin_notes']) ? trim($_POST['admin_notes']) : '';
+    } else {
+        $action = '';
+    }
 
-    if (!empty($voucher_id) && !empty($action)) {
+    if (!empty($voucher_id) && !empty($action) && (isset($_POST['approve_voucher']) || isset($_POST['reject_voucher']))) {
         // Start transaction
         $conn->begin_transaction();
 
@@ -412,7 +421,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_delay'])) {
             $delay_app = $delay_result->fetch_assoc();
 
             if ($delay_app) {
-                $status = $action;
+                $status = $delay_action;  // Changed from $action to $delay_action
                 $update_data = [
                     'status' => $status,
                     'admin_notes' => $admin_notes,
@@ -420,7 +429,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_delay'])) {
                     'processed_date' => date('Y-m-d H:i:s')
                 ];
 
-                if ($action == 'forwarded_to_transport') {
+                if ($delay_action == 'forwarded_to_transport') {  // Changed from $action to $delay_action
                     $update_data['forwarded_date'] = date('Y-m-d H:i:s');
                 }
 
@@ -428,13 +437,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_delay'])) {
                 $months_array = explode(',', $months_applied);
                 $fee_status = 'Pending';
 
-                if ($action == 'approved') {
+                if ($delay_action == 'approved') {  // Changed from $action to $delay_action
                     $fee_status = 'Delay Approved';
-                } elseif ($action == 'disapproved') {
+                } elseif ($delay_action == 'disapproved') {  // Changed from $action to $delay_action
                     $fee_status = 'Delay Rejected';
-                } elseif ($action == 'forwarded_to_transport') {
+                } elseif ($delay_action == 'forwarded_to_transport') {  // Changed from $action to $delay_action
                     $fee_status = 'Under Transport Review';
-                } elseif ($action == 'under_review') {
+                } elseif ($delay_action == 'under_review') {  // Changed from $action to $delay_action
                     $fee_status = 'Under Admin Review';
                 }
 
@@ -1375,12 +1384,14 @@ $pending_count = $pending_count_result->fetch_assoc()['count'];
                                                         placeholder="Add notes..." rows="2"></textarea>
 
                                                     <div class="btn-group btn-group-sm">
-                                                        <button type="submit" name="action" value="approve"
-                                                            class="btn btn-success">
+                                                        <button type="submit" name="approve_voucher" value="1"
+                                                            class="btn btn-success"
+                                                            onclick="return confirmVoucherAction(this)">
                                                             <i class="fas fa-check"></i> Approve
                                                         </button>
-                                                        <button type="submit" name="action" value="reject"
-                                                            class="btn btn-danger">
+                                                        <button type="submit" name="reject_voucher" value="1"
+                                                            class="btn btn-danger"
+                                                            onclick="return confirmVoucherAction(this)">
                                                             <i class="fas fa-times"></i> Reject
                                                         </button>
                                                     </div>
@@ -2018,8 +2029,8 @@ $pending_count = $pending_count_result->fetch_assoc()['count'];
         });
 
         // Confirm voucher action
-        function confirmVoucherAction(form) {
-            const action = form.querySelector('button[type="submit"]').value;
+        function confirmVoucherAction(button) {
+            const action = button.name === 'approve_voucher' ? 'approve' : 'reject';
             const confirmMsg = action === 'approve'
                 ? 'Are you sure you want to APPROVE this voucher? This will update fee status to "Submitted".'
                 : 'Are you sure you want to REJECT this voucher?';
