@@ -71,6 +71,13 @@ if (!isset($_SESSION['admin_logged_in'])) {
     exit;
 }
 
+// Handle logout - MUST BE BEFORE ANY HTML OUTPUT
+if (isset($_GET['logout'])) {
+    session_destroy();
+    header('Location: admin.php');
+    exit;
+}
+
 // Handle actions
 $action_message = '';
 $action_type = '';
@@ -1962,12 +1969,5 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
 </html>
 
 <?php
-// Handle logout
-if (isset($_GET['logout'])) {
-    session_destroy();
-    header('Location: admin.php');
-    exit;
-}
-
 $conn->close();
 ?>
