@@ -1774,22 +1774,22 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <form method="POST">
-                    <input type="hidden" name="delay_id" id="modal_delay_id">
+                    <input type="hidden" name="delay_id" id="modal_delay_app_id">
                     <input type="hidden" name="student_id" id="modal_delay_student_id">
-                    <input type="hidden" name="months_applied" id="modal_months_applied">
+                    <input type="hidden" name="months_applied" id="modal_delay_months_applied">
 
                     <div class="modal-body">
                         <div class="mb-3">
                             <label class="form-label">Student</label>
-                            <input type="text" class="form-control" id="modal_student_name" readonly>
+                            <input type="text" class="form-control" id="modal_delay_student_name" readonly>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Months Applied</label>
-                            <input type="text" class="form-control" id="modal_months_list" readonly>
+                            <input type="text" class="form-control" id="modal_delay_months_list" readonly>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Action</label>
-                            <select class="form-select" name="delay_action" id="delay_action" required>
+                            <select class="form-select" name="delay_action" id="delay_action_select" required>
                                 <option value="">Select action...</option>
                                 <option value="under_review">Mark as Under Review</option>
                                 <option value="forwarded_to_transport">Forward to Transport Office</option>
@@ -1798,8 +1798,8 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
                             </select>
                         </div>
                         <div class="mb-3">
-                            <label for="delay_admin_notes" class="form-label">Admin Notes</label>
-                            <textarea class="form-control" id="delay_admin_notes" name="admin_notes" rows="3"
+                            <label for="modal_delay_admin_notes" class="form-label">Admin Notes</label>
+                            <textarea class="form-control" id="modal_delay_admin_notes" name="admin_notes" rows="3"
                                 placeholder="Add notes or reason for action..."></textarea>
                         </div>
                     </div>
@@ -1873,11 +1873,11 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
                 delayActionModal.addEventListener('show.bs.modal', function (event) {
                     const button = event.relatedTarget;
 
-                    document.getElementById('modal_delay_id').value = button.getAttribute('data-app-id');
+                    document.getElementById('modal_delay_app_id').value = button.getAttribute('data-app-id');
                     document.getElementById('modal_delay_student_id').value = button.getAttribute('data-student-id');
-                    document.getElementById('modal_student_name').value = button.getAttribute('data-student-name');
-                    document.getElementById('modal_months_applied').value = button.getAttribute('data-months-applied');
-                    document.getElementById('modal_months_list').value = button.getAttribute('data-months-applied');
+                    document.getElementById('modal_delay_student_name').value = button.getAttribute('data-student-name');
+                    document.getElementById('modal_delay_months_applied').value = button.getAttribute('data-months-applied');
+                    document.getElementById('modal_delay_months_list').value = button.getAttribute('data-months-applied');
                 });
             }
 
