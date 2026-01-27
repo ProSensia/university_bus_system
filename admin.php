@@ -889,13 +889,6 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
         .modal {
             z-index: 1050 !important;
         }
-        /* Fix for tab switching */
-        .tab-pane {
-            display: none;
-        }
-        .tab-pane.active {
-            display: block;
-        }
         .nav-link {
             cursor: pointer;
         }
@@ -977,12 +970,12 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
         <!-- Navigation Tabs -->
         <ul class="nav nav-tabs mb-4" id="adminTabs" role="tablist">
             <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="students-tab" data-bs-target="#students" type="button" role="tab">
+                <button class="nav-link active" id="students-tab" data-bs-toggle="tab" data-bs-target="#students" type="button" role="tab" aria-controls="students" aria-selected="true">
                     <i class="fas fa-users"></i> Students & Fees
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="vouchers-tab" data-bs-target="#vouchers" type="button" role="tab">
+                <button class="nav-link" id="vouchers-tab" data-bs-toggle="tab" data-bs-target="#vouchers" type="button" role="tab" aria-controls="vouchers" aria-selected="false">
                     <i class="fas fa-receipt"></i> Fee Vouchers
                     <?php if ($pending_count > 0): ?>
                         <span class="badge bg-danger voucher-badge"><?php echo $pending_count; ?></span>
@@ -990,22 +983,22 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="seats-tab" data-bs-target="#seats" type="button" role="tab">
+                <button class="nav-link" id="seats-tab" data-bs-toggle="tab" data-bs-target="#seats" type="button" role="tab" aria-controls="seats" aria-selected="false">
                     <i class="fas fa-chair"></i> Booked Seats
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="add-tab" data-bs-target="#add" type="button" role="tab">
+                <button class="nav-link" id="add-tab" data-bs-toggle="tab" data-bs-target="#add" type="button" role="tab" aria-controls="add" aria-selected="false">
                     <i class="fas fa-plus"></i> Add Student
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="months-tab" data-bs-target="#months" type="button" role="tab">
+                <button class="nav-link" id="months-tab" data-bs-toggle="tab" data-bs-target="#months" type="button" role="tab" aria-controls="months" aria-selected="false">
                     <i class="fas fa-calendar"></i> Manage Months
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="delay-tab" data-bs-target="#delay" type="button" role="tab">
+                <button class="nav-link" id="delay-tab" data-bs-toggle="tab" data-bs-target="#delay" type="button" role="tab" aria-controls="delay" aria-selected="false">
                     <i class="fas fa-clock"></i> Delay Applications
                     <?php if ($delay_pending_count > 0): ?>
                         <span class="badge bg-danger voucher-badge"><?php echo $delay_pending_count; ?></span>
@@ -1125,27 +1118,27 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
                         <!-- Tab Navigation for Delay Applications -->
                         <ul class="nav nav-pills mb-4" id="delayTab" role="tablist">
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link active" data-bs-target="#delay-pending" type="button">
+                                <button class="nav-link active" id="delay-pending-tab" data-bs-toggle="tab" data-bs-target="#delay-pending" type="button" role="tab">
                                     Pending <span class="badge bg-warning"><?php echo $delay_pending_count; ?></span>
                                 </button>
                             </li>
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link" data-bs-target="#delay-under-review" type="button">
+                                <button class="nav-link" id="delay-under-review-tab" data-bs-toggle="tab" data-bs-target="#delay-under-review" type="button" role="tab">
                                     Under Review
                                 </button>
                             </li>
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link" data-bs-target="#delay-forwarded" type="button">
+                                <button class="nav-link" id="delay-forwarded-tab" data-bs-toggle="tab" data-bs-target="#delay-forwarded" type="button" role="tab">
                                     Forwarded to Transport
                                 </button>
                             </li>
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link" data-bs-target="#delay-approved" type="button">
+                                <button class="nav-link" id="delay-approved-tab" data-bs-toggle="tab" data-bs-target="#delay-approved" type="button" role="tab">
                                     Approved
                                 </button>
                             </li>
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link" data-bs-target="#delay-disapproved" type="button">
+                                <button class="nav-link" id="delay-disapproved-tab" data-bs-toggle="tab" data-bs-target="#delay-disapproved" type="button" role="tab">
                                     Disapproved
                                 </button>
                             </li>
@@ -1821,172 +1814,148 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Fix for tab switching
         document.addEventListener('DOMContentLoaded', function () {
-            // Handle tab clicks
-            document.querySelectorAll('#adminTabs .nav-link').forEach(function (tab) {
-                tab.addEventListener('click', function (e) {
-                    e.preventDefault();
+            // Fee modal functionality
+            const feeModal = document.getElementById('feeModal');
+            if (feeModal) {
+                feeModal.addEventListener('show.bs.modal', function (event) {
+                    const button = event.relatedTarget;
 
-                    // Remove active class from all tabs and panes
-                    document.querySelectorAll('#adminTabs .nav-link').forEach(function (t) {
-                        t.classList.remove('active');
-                    });
-                    document.querySelectorAll('.tab-pane').forEach(function (pane) {
-                        pane.classList.remove('active', 'show');
-                    });
+                    document.getElementById('modal_student_id').value = button.getAttribute('data-student-id');
+                    document.getElementById('modal_student_name').value = button.getAttribute('data-student-name');
+                    document.getElementById('modal_month_id').value = button.getAttribute('data-month-id');
+                    document.getElementById('modal_month_name').value = button.getAttribute('data-month-name');
 
-                    // Add active class to clicked tab
-                    this.classList.add('active');
-
-                    // Show corresponding pane
-                    const target = this.getAttribute('data-bs-target');
-                    document.querySelector(target).classList.add('active', 'show');
+                    // Set current status in select
+                    const currentStatus = button.getAttribute('data-current-status');
+                    const statusSelect = document.querySelector('#feeModal select[name="status"]');
+                    if (statusSelect) {
+                        statusSelect.value = currentStatus;
+                    }
                 });
-            });
-        });
-
-        // Fee modal functionality
-        const feeModal = document.getElementById('feeModal');
-        if (feeModal) {
-            feeModal.addEventListener('show.bs.modal', function (event) {
-                const button = event.relatedTarget;
-
-                document.getElementById('modal_student_id').value = button.getAttribute('data-student-id');
-                document.getElementById('modal_student_name').value = button.getAttribute('data-student-name');
-                document.getElementById('modal_month_id').value = button.getAttribute('data-month-id');
-                document.getElementById('modal_month_name').value = button.getAttribute('data-month-name');
-
-                // Set current status in select
-                const currentStatus = button.getAttribute('data-current-status');
-                const statusSelect = document.querySelector('#feeModal select[name="status"]');
-                if (statusSelect) {
-                    statusSelect.value = currentStatus;
-                }
-            });
-        }
-
-        // Bulk fee modal functionality
-        const bulkFeeModal = document.getElementById('bulkFeeModal');
-        if (bulkFeeModal) {
-            bulkFeeModal.addEventListener('show.bs.modal', function (event) {
-                const button = event.relatedTarget;
-
-                const studentId = button.getAttribute('data-student-id');
-                document.getElementById('bulk_student_id').value = studentId;
-                document.getElementById('bulk_student_name').value = button.getAttribute('data-student-name');
-            });
-        }
-
-        // Replace seat modal functionality
-        const replaceModal = document.getElementById('replaceModal');
-        if (replaceModal) {
-            replaceModal.addEventListener('show.bs.modal', function (event) {
-                const button = event.relatedTarget;
-
-                const seatNumber = button.getAttribute('data-seat-number');
-                const passengerName = button.getAttribute('data-passenger-name');
-                const universityId = button.getAttribute('data-university-id');
-                const gender = button.getAttribute('data-gender');
-
-                document.getElementById('replace_old_seat').value = seatNumber;
-                document.getElementById('replace_passenger_name').value = passengerName;
-                document.getElementById('replace_university_id').value = universityId;
-                document.getElementById('replace_gender').value = gender;
-                document.getElementById('replace_current_seat').value = seatNumber;
-                document.getElementById('replace_current_passenger').value = passengerName;
-            });
-        }
-
-        // Delay Action Modal
-        const delayActionModal = document.getElementById('delayActionModal');
-        if (delayActionModal) {
-            delayActionModal.addEventListener('show.bs.modal', function (event) {
-                const button = event.relatedTarget;
-
-                document.getElementById('modal_delay_id').value = button.getAttribute('data-app-id');
-                document.getElementById('modal_delay_student_id').value = button.getAttribute('data-student-id');
-                document.getElementById('modal_student_name').value = button.getAttribute('data-student-name');
-                document.getElementById('modal_months_applied').value = button.getAttribute('data-months-applied');
-                document.getElementById('modal_months_list').value = button.getAttribute('data-months-applied');
-            });
-        }
-
-        // Month management functions
-        function toggleMonthStatus(checkbox, statusId) {
-            const statusSelect = document.getElementById(statusId);
-            if (statusSelect) {
-                statusSelect.disabled = !checkbox.checked;
             }
-        }
 
-        function selectAllMonths(selectAll) {
-            const checkboxes = document.querySelectorAll('input[name="selected_months[]"]');
-            checkboxes.forEach(checkbox => {
-                checkbox.checked = selectAll;
-                toggleMonthStatus(checkbox, 'status_' + checkbox.value);
-            });
-        }
+            // Bulk fee modal functionality
+            const bulkFeeModal = document.getElementById('bulkFeeModal');
+            if (bulkFeeModal) {
+                bulkFeeModal.addEventListener('show.bs.modal', function (event) {
+                    const button = event.relatedTarget;
 
-        function setAllSelectedMonths(status) {
-            const checkboxes = document.querySelectorAll('input[name="selected_months[]"]:checked');
-            checkboxes.forEach(checkbox => {
-                const statusSelect = document.getElementById('status_' + checkbox.value);
-                if (statusSelect && !statusSelect.disabled) {
-                    statusSelect.value = status;
-                }
-            });
-        }
+                    const studentId = button.getAttribute('data-student-id');
+                    document.getElementById('bulk_student_id').value = studentId;
+                    document.getElementById('bulk_student_name').value = button.getAttribute('data-student-name');
+                });
+            }
 
-        function selectAllBulkMonths(selectAll) {
-            const checkboxes = document.querySelectorAll('.bulk-month-check');
-            checkboxes.forEach(checkbox => {
-                checkbox.checked = selectAll;
-            });
-        }
+            // Replace seat modal functionality
+            const replaceModal = document.getElementById('replaceModal');
+            if (replaceModal) {
+                replaceModal.addEventListener('show.bs.modal', function (event) {
+                    const button = event.relatedTarget;
 
-        function setBulkAllFees(status) {
-            const checkboxes = document.querySelectorAll('.bulk-month-check:checked');
-            checkboxes.forEach(checkbox => {
-                const monthId = checkbox.value;
-                const select = document.getElementById('bulk_status_' + monthId);
-                if (select) {
-                    select.value = status;
-                }
-            });
-        }
+                    const seatNumber = button.getAttribute('data-seat-number');
+                    const passengerName = button.getAttribute('data-passenger-name');
+                    const universityId = button.getAttribute('data-university-id');
+                    const gender = button.getAttribute('data-gender');
 
-        // Enable/disable month status when checkbox is clicked (Add Student tab)
-        document.querySelectorAll('.month-check').forEach(checkbox => {
-            checkbox.addEventListener('change', function () {
-                const statusId = 'status_' + this.value;
+                    document.getElementById('replace_old_seat').value = seatNumber;
+                    document.getElementById('replace_passenger_name').value = passengerName;
+                    document.getElementById('replace_university_id').value = universityId;
+                    document.getElementById('replace_gender').value = gender;
+                    document.getElementById('replace_current_seat').value = seatNumber;
+                    document.getElementById('replace_current_passenger').value = passengerName;
+                });
+            }
+
+            // Delay Action Modal
+            const delayActionModal = document.getElementById('delayActionModal');
+            if (delayActionModal) {
+                delayActionModal.addEventListener('show.bs.modal', function (event) {
+                    const button = event.relatedTarget;
+
+                    document.getElementById('modal_delay_id').value = button.getAttribute('data-app-id');
+                    document.getElementById('modal_delay_student_id').value = button.getAttribute('data-student-id');
+                    document.getElementById('modal_student_name').value = button.getAttribute('data-student-name');
+                    document.getElementById('modal_months_applied').value = button.getAttribute('data-months-applied');
+                    document.getElementById('modal_months_list').value = button.getAttribute('data-months-applied');
+                });
+            }
+
+            // Month management functions
+            function toggleMonthStatus(checkbox, statusId) {
                 const statusSelect = document.getElementById(statusId);
                 if (statusSelect) {
-                    statusSelect.disabled = !this.checked;
+                    statusSelect.disabled = !checkbox.checked;
                 }
+            }
+
+            window.selectAllMonths = function(selectAll) {
+                const checkboxes = document.querySelectorAll('input[name="selected_months[]"]');
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = selectAll;
+                    toggleMonthStatus(checkbox, 'status_' + checkbox.value);
+                });
+            };
+
+            window.setAllSelectedMonths = function(status) {
+                const checkboxes = document.querySelectorAll('input[name="selected_months[]"]:checked');
+                checkboxes.forEach(checkbox => {
+                    const statusSelect = document.getElementById('status_' + checkbox.value);
+                    if (statusSelect && !statusSelect.disabled) {
+                        statusSelect.value = status;
+                    }
+                });
+            };
+
+            window.selectAllBulkMonths = function(selectAll) {
+                const checkboxes = document.querySelectorAll('.bulk-month-check');
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = selectAll;
+                });
+            };
+
+            window.setBulkAllFees = function(status) {
+                const checkboxes = document.querySelectorAll('.bulk-month-check:checked');
+                checkboxes.forEach(checkbox => {
+                    const monthId = checkbox.value;
+                    const select = document.getElementById('bulk_status_' + monthId);
+                    if (select) {
+                        select.value = status;
+                    }
+                });
+            };
+
+            // Enable/disable month status when checkbox is clicked (Add Student tab)
+            document.querySelectorAll('.month-check').forEach(checkbox => {
+                checkbox.addEventListener('change', function () {
+                    const statusId = 'status_' + this.value;
+                    const statusSelect = document.getElementById(statusId);
+                    if (statusSelect) {
+                        statusSelect.disabled = !this.checked;
+                    }
+                });
             });
+
+            // Confirm voucher action
+            window.confirmVoucherAction = function(button) {
+                const action = button.value;
+                const confirmMsg = action === 'approve'
+                    ? 'Are you sure you want to APPROVE this voucher? This will update fee status to "Submitted".'
+                    : 'Are you sure you want to REJECT this voucher?';
+
+                return confirm(confirmMsg);
+            };
+
+            // Logout confirmation
+            const logoutLink = document.querySelector('a[href="?logout"]');
+            if (logoutLink) {
+                logoutLink.addEventListener('click', function (e) {
+                    if (!confirm('Are you sure you want to logout?')) {
+                        e.preventDefault();
+                    }
+                });
+            }
         });
-
-        // Confirm voucher action
-        // Confirm voucher action
-        function confirmVoucherAction(button) {
-            const action = button.value;
-            const confirmMsg = action === 'approve'
-                ? 'Are you sure you want to APPROVE this voucher? This will update fee status to "Submitted".'
-                : 'Are you sure you want to REJECT this voucher?';
-
-            return confirm(confirmMsg);
-        }
-
-        // Logout confirmation
-        const logoutLink = document.querySelector('a[href="?logout"]');
-        if (logoutLink) {
-            logoutLink.addEventListener('click', function (e) {
-                if (!confirm('Are you sure you want to logout?')) {
-                    e.preventDefault();
-                }
-            });
-        }
     </script>
 </body>
 
