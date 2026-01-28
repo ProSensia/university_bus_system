@@ -1,7 +1,4 @@
 <?php
-// Add output buffering at the VERY TOP to prevent header errors
-ob_start();
-
 include 'connection.php';
 session_start();
 
@@ -24,10 +21,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
 
 // Check if user is logged in
 if (!isset($_SESSION['admin_logged_in'])) {
-    ob_end_clean(); // Clear buffer before showing login
     ?>
     <!DOCTYPE html>
     <html lang="en">
+
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -35,6 +32,7 @@ if (!isset($_SESSION['admin_logged_in'])) {
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     </head>
+
     <body class="bg-light">
         <div class="container mt-5">
             <div class="row justify-content-center">
@@ -45,7 +43,7 @@ if (!isset($_SESSION['admin_logged_in'])) {
                         </div>
                         <div class="card-body">
                             <?php if (isset($error)): ?>
-                                <div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div>
+                                <div class="alert alert-danger"><?php echo $error; ?></div>
                             <?php endif; ?>
                             <form method="POST">
                                 <div class="mb-3">
@@ -66,15 +64,9 @@ if (!isset($_SESSION['admin_logged_in'])) {
             </div>
         </div>
     </body>
+
     </html>
     <?php
-    exit;
-}
-
-// Handle logout - MUST BE BEFORE ANY HTML OUTPUT
-if (isset($_GET['logout'])) {
-    session_destroy();
-    header('Location: admin.php');
     exit;
 }
 
@@ -84,8 +76,6 @@ $action_type = '';
 
 // Download Sample Excel File
 if (isset($_GET['download_sample'])) {
-    ob_end_clean(); // Clear buffer before headers
-    
     // Get months dynamically
     $months_sql = "SELECT * FROM months ORDER BY id";
     $months_result = $conn->query($months_sql);
@@ -132,8 +122,6 @@ if (isset($_GET['download_sample'])) {
 
 // Export to Excel
 if (isset($_GET['export_excel'])) {
-    ob_end_clean(); // Clear buffer before headers
-    
     // Get months dynamically
     $months_sql = "SELECT * FROM months ORDER BY id";
     $months_result = $conn->query($months_sql);
@@ -209,12 +197,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_excel'])) {
 
             // Process each row
             for ($i = 1; $i < count($lines); $i++) {
-                if (empty(trim($lines[$i])))
-                    continue;
+                if (empty(trim($lines[$i]))) continue;
 
                 $row_data = explode("\t", trim($lines[$i]));
-                if (count($row_data) < 5)
-                    continue;
+                if (count($row_data) < 5) continue;
 
                 $sno = $row_data[0];
                 $name = $row_data[1];
@@ -295,104 +281,99 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_excel'])) {
     }
 }
 
-// Handle voucher verification - SIMPLE FIX
+// Handle voucher verification
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_voucher'])) {
-    $action = $_POST['verify_voucher']; // This will be 'approve' or 'reject'
-    $voucher_id = isset($_POST['voucher_id']) ? $_POST['voucher_id'] : '';
-    $admin_notes = isset($_POST['admin_notes']) ? trim($_POST['admin_notes']) : '';
+    $voucher_id = $_POST['voucher_id'];
+    $action = $_POST['action'];
+    $admin_notes = trim($_POST['admin_notes']);
 
-    if (!empty($voucher_id) && !empty($action)) {
-        // Start transaction
-        $conn->begin_transaction();
+    // Start transaction
+    $conn->begin_transaction();
 
-        try {
-            $voucher_sql = "SELECT * FROM fee_vouchers WHERE id = ? FOR UPDATE";
-            $voucher_stmt = $conn->prepare($voucher_sql);
-            $voucher_stmt->bind_param("i", $voucher_id);
-            $voucher_stmt->execute();
-            $voucher_result = $voucher_stmt->get_result();
-            $voucher = $voucher_result->fetch_assoc();
+    try {
+        $voucher_sql = "SELECT * FROM fee_vouchers WHERE id = ? FOR UPDATE";
+        $voucher_stmt = $conn->prepare($voucher_sql);
+        $voucher_stmt->bind_param("i", $voucher_id);
+        $voucher_stmt->execute();
+        $voucher_result = $voucher_stmt->get_result();
+        $voucher = $voucher_result->fetch_assoc();
 
-            if ($voucher) {
-                if ($action === 'approve') {
-                    $months_applied = $voucher['months_applied'];
-                    $months_array = explode(',', $months_applied);
+        if ($voucher) {
+            if ($action === 'approve') {
+                $months_applied = $voucher['months_applied'];
+                $months_array = explode(',', $months_applied);
 
-                    // Update fee payments for each month
-                    foreach ($months_array as $month_name) {
-                        $month_name = trim($month_name);
-
-                        // Get month ID
-                        $month_sql = "SELECT id FROM months WHERE month_name = ?";
-                        $month_stmt = $conn->prepare($month_sql);
-                        $month_stmt->bind_param("s", $month_name);
-                        $month_stmt->execute();
-                        $month_result = $month_stmt->get_result();
-
-                        if ($month_result->num_rows > 0) {
-                            $month_data = $month_result->fetch_assoc();
-                            $month_id = $month_data['id'];
-
-                            // Update fee payment
-                            $fee_sql = "INSERT INTO fee_payments (student_id, month_id, status) 
-                                       VALUES (?, ?, 'Submitted') 
-                                       ON DUPLICATE KEY UPDATE status = 'Submitted'";
-                            $fee_stmt = $conn->prepare($fee_sql);
-                            $fee_stmt->bind_param("ii", $voucher['student_id'], $month_id);
-                            $fee_stmt->execute();
-                            $fee_stmt->close();
-                        }
-                        $month_stmt->close();
+                // Update fee payments for each month
+                foreach ($months_array as $month_name) {
+                    $month_name = trim($month_name);
+                    
+                    // Get month ID
+                    $month_sql = "SELECT id FROM months WHERE month_name = ?";
+                    $month_stmt = $conn->prepare($month_sql);
+                    $month_stmt->bind_param("s", $month_name);
+                    $month_stmt->execute();
+                    $month_result = $month_stmt->get_result();
+                    
+                    if ($month_result->num_rows > 0) {
+                        $month_data = $month_result->fetch_assoc();
+                        $month_id = $month_data['id'];
+                        
+                        // Update fee payment
+                        $fee_sql = "INSERT INTO fee_payments (student_id, month_id, status) 
+                                   VALUES (?, ?, 'Submitted') 
+                                   ON DUPLICATE KEY UPDATE status = 'Submitted'";
+                        $fee_stmt = $conn->prepare($fee_sql);
+                        $fee_stmt->bind_param("ii", $voucher['student_id'], $month_id);
+                        $fee_stmt->execute();
+                        $fee_stmt->close();
                     }
-
-                    $status = 'approved';
-                    $action_message = "Voucher approved successfully! Fee status updated.";
-                } else {
-                    $status = 'rejected';
-                    $action_message = "Voucher rejected.";
+                    $month_stmt->close();
                 }
-
-                // Update voucher status
-                $update_sql = "UPDATE fee_vouchers SET status = ?, admin_notes = ?, processed_date = NOW() WHERE id = ?";
-                $update_stmt = $conn->prepare($update_sql);
-                $update_stmt->bind_param("ssi", $status, $admin_notes, $voucher_id);
-                $update_stmt->execute();
-                $update_stmt->close();
-
-                // Log admin action
-                $student_sql = "SELECT name FROM students WHERE id = ?";
-                $student_stmt = $conn->prepare($student_sql);
-                $student_stmt->bind_param("i", $voucher['student_id']);
-                $student_stmt->execute();
-                $student_result = $student_stmt->get_result();
-
-                if ($student_result->num_rows > 0) {
-                    $student_data = $student_result->fetch_assoc();
-
-                    $log_sql = "INSERT INTO admin_logs (admin_username, action, target_student, ip_address) VALUES (?, ?, ?, ?)";
-                    $log_stmt = $conn->prepare($log_sql);
-                    $log_action = "Voucher $status for " . $student_data['name'] . " (Months: " . $voucher['months_applied'] . ")";
-                    $log_stmt->bind_param("ssss", $_SESSION['admin_username'], $log_action, $student_data['name'], $_SERVER['REMOTE_ADDR']);
-                    $log_stmt->execute();
-                    $log_stmt->close();
-                }
-                $student_stmt->close();
-
-                $action_type = "success";
+                
+                $status = 'approved';
+                $action_message = "Voucher approved successfully! Fee status updated.";
             } else {
-                throw new Exception("Voucher not found!");
+                $status = 'rejected';
+                $action_message = "Voucher rejected.";
             }
 
-            $voucher_stmt->close();
-            $conn->commit();
+            // Update voucher status
+            $update_sql = "UPDATE fee_vouchers SET status = ?, admin_notes = ?, processed_date = NOW() WHERE id = ?";
+            $update_stmt = $conn->prepare($update_sql);
+            $update_stmt->bind_param("ssi", $status, $admin_notes, $voucher_id);
+            $update_stmt->execute();
+            $update_stmt->close();
 
-        } catch (Exception $e) {
-            $conn->rollback();
-            $action_message = "Error: " . $e->getMessage();
-            $action_type = "danger";
+            // Log admin action
+            $student_sql = "SELECT name FROM students WHERE id = ?";
+            $student_stmt = $conn->prepare($student_sql);
+            $student_stmt->bind_param("i", $voucher['student_id']);
+            $student_stmt->execute();
+            $student_result = $student_stmt->get_result();
+
+            if ($student_result->num_rows > 0) {
+                $student_data = $student_result->fetch_assoc();
+                
+                $log_sql = "INSERT INTO admin_logs (admin_username, action, target_student, ip_address) VALUES (?, ?, ?, ?)";
+                $log_stmt = $conn->prepare($log_sql);
+                $log_action = "Voucher $status for " . $student_data['name'] . " (Months: " . $voucher['months_applied'] . ")";
+                $log_stmt->bind_param("ssss", $_SESSION['admin_username'], $log_action, $student_data['name'], $_SERVER['REMOTE_ADDR']);
+                $log_stmt->execute();
+                $log_stmt->close();
+            }
+            $student_stmt->close();
+            
+            $action_type = "success";
+        } else {
+            throw new Exception("Voucher not found!");
         }
-    } else {
-        $action_message = "Invalid voucher action request";
+        
+        $voucher_stmt->close();
+        $conn->commit();
+        
+    } catch (Exception $e) {
+        $conn->rollback();
+        $action_message = "Error: " . $e->getMessage();
         $action_type = "danger";
     }
 }
@@ -445,31 +426,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['review_delay'])) {
     }
 }
 
-// Old handler for process_delay - kept for backwards compatibility
-
-                );
-                $log_stmt->execute();
-                $log_stmt->close();
-
-                $action_message = "Delay application processed successfully!";
-                $action_type = "success";
-            } else {
-                throw new Exception("Delay application not found!");
-            }
-
-            $delay_stmt->close();
-            $conn->commit();
-        } catch (Exception $e) {
-            $conn->rollback();
-            $action_message = "Error processing delay application: " . $e->getMessage();
-            $action_type = "danger";
-        }
-    } else {
-        $action_message = "Invalid delay application request";
-        $action_type = "danger";
-    }
-}
-
 // Add new student with fee management
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_student'])) {
     $sno = $_POST['sno'];
@@ -492,17 +448,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_student'])) {
         // Get ALL months from database
         $all_months_sql = "SELECT id FROM months ORDER BY id";
         $all_months_result = $conn->query($all_months_sql);
-
+        
         // Add fee payments for ALL months
         while ($month = $all_months_result->fetch_assoc()) {
             $month_id = $month['id'];
-
+            
             // Check if this month was selected with a specific status
             $status = 'Pending'; // Default
             if (in_array($month_id, $selected_months) && isset($month_status[$month_id])) {
                 $status = $month_status[$month_id];
             }
-
+            
             $fee_sql = "INSERT INTO fee_payments (student_id, month_id, status) VALUES (?, ?, ?)";
             $fee_stmt = $conn->prepare($fee_sql);
             $fee_stmt->bind_param("iis", $student_id, $month_id, $status);
@@ -549,28 +505,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_update_fees'])) 
 
     $success = true;
     $conn->begin_transaction();
-
+    
     try {
         // Update only selected months
         foreach ($selected_months as $month_id) {
             $status = isset($month_status[$month_id]) ? $month_status[$month_id] : 'Pending';
-
+            
             $sql = "INSERT INTO fee_payments (student_id, month_id, status) 
                     VALUES (?, ?, ?) 
                     ON DUPLICATE KEY UPDATE status = ?";
             $stmt = $conn->prepare($sql);
             $stmt->bind_param("iiss", $student_id, $month_id, $status, $status);
-
+            
             if (!$stmt->execute()) {
                 throw new Exception("Error updating month ID: $month_id");
             }
             $stmt->close();
         }
-
+        
         $conn->commit();
         $action_message = "Fee status updated successfully for selected months!";
         $action_type = "success";
-
+        
     } catch (Exception $e) {
         $conn->rollback();
         $action_message = "Error updating fee status: " . $e->getMessage();
@@ -588,14 +544,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_month'])) {
     $check_stmt->bind_param("s", $month_name);
     $check_stmt->execute();
     $check_result = $check_stmt->get_result();
-
+    
     if ($check_result->num_rows > 0) {
         $action_message = "Month '$month_name' already exists!";
         $action_type = "warning";
         $check_stmt->close();
     } else {
         $check_stmt->close();
-
+        
         // Start transaction
         $conn->begin_transaction();
 
@@ -611,13 +567,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_month'])) {
             // 2. Get all active students
             $students_sql = "SELECT id FROM students WHERE is_active = TRUE";
             $students_result = $conn->query($students_sql);
-
+            
             $success_count = 0;
-
+            
             // 3. Prepare the fee payment insert statement
             $fee_sql = "INSERT INTO fee_payments (student_id, month_id, status) VALUES (?, ?, 'Pending')";
             $fee_stmt = $conn->prepare($fee_sql);
-
+            
             // 4. Insert fee payment records for each student for the new month
             while ($student = $students_result->fetch_assoc()) {
                 $fee_stmt->bind_param("ii", $student['id'], $new_month_id);
@@ -625,15 +581,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_month'])) {
                     $success_count++;
                 }
             }
-
+            
             $fee_stmt->close();
-
+            
             // Commit the transaction
             $conn->commit();
-
+            
             $action_message = "Month '$month_name' added successfully! Fee records created for $success_count students.";
             $action_type = "success";
-
+            
         } catch (Exception $e) {
             // Rollback on error
             $conn->rollback();
@@ -648,7 +604,7 @@ if (isset($_GET['delete_student'])) {
     $student_id = $_GET['delete_student'];
 
     $conn->begin_transaction();
-
+    
     try {
         // Delete from fee_payments
         $fee_sql = "DELETE FROM fee_payments WHERE student_id = ?";
@@ -663,11 +619,11 @@ if (isset($_GET['delete_student'])) {
         $stmt->bind_param("i", $student_id);
         $stmt->execute();
         $stmt->close();
-
+        
         $conn->commit();
         $action_message = "Student deleted successfully!";
         $action_type = "success";
-
+        
     } catch (Exception $e) {
         $conn->rollback();
         $action_message = "Error deleting student: " . $e->getMessage();
@@ -762,6 +718,7 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -774,69 +731,94 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
             margin: 0 auto;
             padding: 20px;
         }
+
         .nav-tabs .nav-link.active {
             font-weight: bold;
             background-color: #f8f9fa;
             border-bottom-color: #f8f9fa;
         }
+
         .fee-status-badge {
             cursor: pointer;
             min-width: 100px;
         }
+
         .table-responsive {
             max-height: 600px;
             overflow-y: auto;
         }
+
         .bg-pink {
             background-color: #ff66b2 !important;
         }
+
         .seat-actions {
             min-width: 200px;
         }
+
         .fee-card {
             transition: all 0.3s ease;
         }
+
         .fee-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
+
         .bulk-fee-btn {
             min-width: 120px;
         }
+
         .month-checkbox {
             min-height: 80px;
         }
+
         .export-import-section {
             background: linear-gradient(135deg, #f8f9fa, #e9ecef);
             border-radius: 10px;
             padding: 20px;
             margin-bottom: 20px;
         }
+
         .voucher-badge {
             font-size: 0.7em;
             margin-left: 5px;
         }
+        
         .tab-pane {
             padding-top: 20px;
         }
+        
         .modal-backdrop {
             z-index: 1040 !important;
         }
+        
         .modal {
             z-index: 1050 !important;
         }
+        
+        /* Fix for tab switching */
+        .tab-pane {
+            display: none;
+        }
+        
+        .tab-pane.active {
+            display: block;
+        }
+        
         .nav-link {
             cursor: pointer;
         }
     </style>
 </head>
+
 <body>
     <div class="admin-container">
         <!-- Header -->
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h1><i class="fas fa-cog"></i> Admin Panel - Bus Booking System</h1>
             <div>
-                <span class="text-muted">Welcome, <?php echo htmlspecialchars($_SESSION['admin_username']); ?></span>
+                <span class="text-muted">Welcome, <?php echo $_SESSION['admin_username']; ?></span>
                 <a href="?logout" class="btn btn-outline-danger btn-sm ms-2">
                     <i class="fas fa-sign-out-alt"></i> Logout
                 </a>
@@ -848,7 +830,7 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
 
         <?php if ($action_message): ?>
             <div class="alert alert-<?php echo $action_type; ?> alert-dismissible fade show" role="alert">
-                <?php echo htmlspecialchars($action_message); ?>
+                <?php echo $action_message; ?>
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         <?php endif; ?>
@@ -906,12 +888,12 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
         <!-- Navigation Tabs -->
         <ul class="nav nav-tabs mb-4" id="adminTabs" role="tablist">
             <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="students-tab" data-bs-toggle="tab" data-bs-target="#students" type="button" role="tab" aria-controls="students" aria-selected="true">
+                <button class="nav-link active" id="students-tab" data-bs-target="#students" type="button" role="tab">
                     <i class="fas fa-users"></i> Students & Fees
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="vouchers-tab" data-bs-toggle="tab" data-bs-target="#vouchers" type="button" role="tab" aria-controls="vouchers" aria-selected="false">
+                <button class="nav-link" id="vouchers-tab" data-bs-target="#vouchers" type="button" role="tab">
                     <i class="fas fa-receipt"></i> Fee Vouchers
                     <?php if ($pending_count > 0): ?>
                         <span class="badge bg-danger voucher-badge"><?php echo $pending_count; ?></span>
@@ -919,22 +901,22 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="seats-tab" data-bs-toggle="tab" data-bs-target="#seats" type="button" role="tab" aria-controls="seats" aria-selected="false">
+                <button class="nav-link" id="seats-tab" data-bs-target="#seats" type="button" role="tab">
                     <i class="fas fa-chair"></i> Booked Seats
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="add-tab" data-bs-toggle="tab" data-bs-target="#add" type="button" role="tab" aria-controls="add" aria-selected="false">
+                <button class="nav-link" id="add-tab" data-bs-target="#add" type="button" role="tab">
                     <i class="fas fa-plus"></i> Add Student
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="months-tab" data-bs-toggle="tab" data-bs-target="#months" type="button" role="tab" aria-controls="months" aria-selected="false">
+                <button class="nav-link" id="months-tab" data-bs-target="#months" type="button" role="tab">
                     <i class="fas fa-calendar"></i> Manage Months
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="delay-tab" data-bs-toggle="tab" data-bs-target="#delay" type="button" role="tab" aria-controls="delay" aria-selected="false">
+                <button class="nav-link" id="delay-tab" data-bs-target="#delay" type="button" role="tab">
                     <i class="fas fa-clock"></i> Delay Applications
                     <?php if ($delay_pending_count > 0): ?>
                         <span class="badge bg-danger voucher-badge"><?php echo $delay_pending_count; ?></span>
@@ -962,16 +944,16 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
                                         <th>Semester</th>
                                         <th>Category</th>
                                         <?php foreach ($months as $month): ?>
-                                            <th><?php echo htmlspecialchars($month['month_name']); ?></th>
+                                            <th><?php echo $month['month_name']; ?></th>
                                         <?php endforeach; ?>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php
+                                    <?php 
                                     // Reset students result pointer
                                     $students_result->data_seek(0);
-                                    while ($student = $students_result->fetch_assoc()):
+                                    while ($student = $students_result->fetch_assoc()): 
                                         // Get fee status for this student
                                         $fee_sql = "SELECT m.id, m.month_name, fp.status 
                                                    FROM months m 
@@ -989,14 +971,14 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
                                         $fee_stmt->close();
                                         ?>
                                         <tr>
-                                            <td><?php echo htmlspecialchars($student['sno']); ?></td>
-                                            <td><?php echo htmlspecialchars($student['name']); ?></td>
-                                            <td><?php echo htmlspecialchars($student['university_id']); ?></td>
-                                            <td><?php echo htmlspecialchars($student['semester']); ?></td>
-                                            <td><?php echo htmlspecialchars($student['category']); ?></td>
+                                            <td><?php echo $student['sno']; ?></td>
+                                            <td><?php echo $student['name']; ?></td>
+                                            <td><?php echo $student['university_id']; ?></td>
+                                            <td><?php echo $student['semester']; ?></td>
+                                            <td><?php echo $student['category']; ?></td>
 
                                             <!-- Fee Status Columns -->
-                                            <?php foreach ($months as $month):
+                                            <?php foreach ($months as $month): 
                                                 $status = isset($fee_status[$month['id']]) ? $fee_status[$month['id']] : 'Pending';
                                                 $badge_class = 'bg-secondary';
                                                 if ($status === 'Submitted') {
@@ -1011,11 +993,11 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
                                                     <span class="badge <?php echo $badge_class; ?> fee-status-badge"
                                                         data-bs-toggle="modal" data-bs-target="#feeModal"
                                                         data-student-id="<?php echo $student['id']; ?>"
-                                                        data-student-name="<?php echo htmlspecialchars($student['name']); ?>"
+                                                        data-student-name="<?php echo $student['name']; ?>"
                                                         data-month-id="<?php echo $month['id']; ?>"
-                                                        data-month-name="<?php echo htmlspecialchars($month['month_name']); ?>"
-                                                        data-current-status="<?php echo htmlspecialchars($status); ?>">
-                                                        <?php echo htmlspecialchars($status); ?>
+                                                        data-month-name="<?php echo $month['month_name']; ?>"
+                                                        data-current-status="<?php echo $status; ?>">
+                                                        <?php echo $status; ?>
                                                     </span>
                                                 </td>
                                             <?php endforeach; ?>
@@ -1025,7 +1007,7 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
                                                     <button type="button" class="btn btn-info bulk-fee-btn"
                                                         data-bs-toggle="modal" data-bs-target="#bulkFeeModal"
                                                         data-student-id="<?php echo $student['id']; ?>"
-                                                        data-student-name="<?php echo htmlspecialchars($student['name']); ?>">
+                                                        data-student-name="<?php echo $student['name']; ?>">
                                                         <i class="fas fa-edit"></i> All Fees
                                                     </button>
                                                     <a href="?delete_student=<?php echo $student['id']; ?>"
@@ -1037,134 +1019,6 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
                                             </td>
                                         </tr>
                                     <?php endwhile; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Delay Applications Tab -->
-            <div class="tab-pane fade" id="delay" role="tabpanel">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0"><i class="fas fa-clock"></i> Fee Delay Applications Management</h5>
-                    </div>
-                    <div class="card-body">
-                        <!-- Pending Delay Applications -->
-                        <h6 class="mb-3">Pending Delay Requests <span class="badge bg-danger"><?php 
-                            $delay_pending_count_sql = "SELECT COUNT(*) as count FROM fee_delay_applications WHERE status = 'pending'";
-                            $delay_pending_result = $conn->query($delay_pending_count_sql);
-                            $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
-                            echo $delay_pending_count;
-                        ?></span></h6>
-
-                        <?php
-                        $pending_delays_sql = "SELECT * FROM fee_delay_applications WHERE status = 'pending' ORDER BY application_date ASC";
-                        $pending_delays_result = $conn->query($pending_delays_sql);
-                        ?>
-
-                        <div class="table-responsive mb-4">
-                            <table class="table table-striped">
-                                <thead class="table-warning">
-                                    <tr>
-                                        <th>Student Name</th>
-                                        <th>University ID</th>
-                                        <th>Months</th>
-                                        <th>Reason for Delay</th>
-                                        <th>Delay Period</th>
-                                        <th>Requested Days</th>
-                                        <th>Application Date</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php 
-                                    if ($pending_delays_result && $pending_delays_result->num_rows > 0) {
-                                        while ($app = $pending_delays_result->fetch_assoc()): ?>
-                                            <tr>
-                                                <td><?php echo htmlspecialchars($app['student_name']); ?></td>
-                                                <td><?php echo htmlspecialchars($app['university_id']); ?></td>
-                                                <td>
-                                                    <?php
-                                                    $months_arr = explode(',', $app['months_applied']);
-                                                    foreach ($months_arr as $m) {
-                                                        echo "<span class='badge bg-primary me-1'>" . htmlspecialchars(trim($m)) . "</span>";
-                                                    }
-                                                    ?>
-                                                </td>
-                                                <td><small><?php echo htmlspecialchars($app['reason_for_delay']); ?></small></td>
-                                                <td><?php echo htmlspecialchars($app['delay_period']); ?></td>
-                                                <td><?php echo htmlspecialchars($app['requested_days']); ?></td>
-                                                <td><?php echo htmlspecialchars($app['application_date']); ?></td>
-                                                <td>
-                                                    <button type="button" class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#delayReviewModal"
-                                                        data-delay-id="<?php echo $app['id']; ?>"
-                                                        data-student-id="<?php echo $app['student_id']; ?>"
-                                                        data-student-name="<?php echo htmlspecialchars($app['student_name']); ?>"
-                                                        data-months-applied="<?php echo htmlspecialchars($app['months_applied']); ?>">
-                                                        <i class="fas fa-eye"></i> Review
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        <?php endwhile;
-                                    } else {
-                                        echo "<tr><td colspan='8' class='text-center text-muted'>No pending delay requests</td></tr>";
-                                    }
-                                    ?>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <!-- Processed Delay Applications -->
-                        <h6 class="mb-3">Processed Delay Requests</h6>
-                        <?php
-                        $processed_delays_sql = "SELECT * FROM fee_delay_applications WHERE status != 'pending' ORDER BY processed_date DESC LIMIT 100";
-                        $processed_delays_result = $conn->query($processed_delays_sql);
-                        ?>
-
-                        <div class="table-responsive">
-                            <table class="table table-sm table-striped">
-                                <thead class="table-secondary">
-                                    <tr>
-                                        <th>Student Name</th>
-                                        <th>University ID</th>
-                                        <th>Months</th>
-                                        <th>Reason</th>
-                                        <th>Status</th>
-                                        <th>Admin Notes</th>
-                                        <th>Processed Date</th>
-                                        <th>Processed By</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php 
-                                    if ($processed_delays_result && $processed_delays_result->num_rows > 0) {
-                                        while ($app = $processed_delays_result->fetch_assoc()):
-                                            $badge_class = '';
-                                            if ($app['status'] == 'approved') $badge_class = 'bg-success';
-                                            elseif ($app['status'] == 'rejected') $badge_class = 'bg-danger';
-                                            else $badge_class = 'bg-warning';
-                                            ?>
-                                            <tr>
-                                                <td><?php echo htmlspecialchars($app['student_name']); ?></td>
-                                                <td><?php echo htmlspecialchars($app['university_id']); ?></td>
-                                                <td><?php echo htmlspecialchars($app['months_applied']); ?></td>
-                                                <td><small><?php echo htmlspecialchars($app['reason_for_delay']); ?></small></td>
-                                                <td>
-                                                    <span class="badge <?php echo $badge_class; ?>">
-                                                        <?php echo ucfirst(str_replace('_', ' ', $app['status'])); ?>
-                                                    </span>
-                                                </td>
-                                                <td><small><?php echo htmlspecialchars($app['admin_notes'] ?: 'N/A'); ?></small></td>
-                                                <td><?php echo htmlspecialchars($app['processed_date'] ?: 'N/A'); ?></td>
-                                                <td><?php echo htmlspecialchars($app['admin_username'] ?: 'N/A'); ?></td>
-                                            </tr>
-                                        <?php endwhile;
-                                    } else {
-                                        echo "<tr><td colspan='8' class='text-center text-muted'>No processed delay requests yet</td></tr>";
-                                    }
-                                    ?>
                                 </tbody>
                             </table>
                         </div>
@@ -1206,32 +1060,34 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
                                     <?php while ($voucher = $pending_vouchers_result->fetch_assoc()):
                                         // FIXED: Safely decode JSON data
                                         $device_info = @json_decode($voucher['device_info'], true);
-                                        if (empty($device_info) || !is_array($device_info)) {
+                                        if (!is_array($device_info)) {
                                             $device_info = array('browser' => 'Unknown', 'platform' => 'Unknown');
                                         }
                                         ?>
                                         <tr>
-                                            <td><?php echo htmlspecialchars($voucher['name']); ?></td>
-                                            <td><?php echo htmlspecialchars($voucher['university_id']); ?></td>
+                                            <td><?php echo $voucher['name']; ?></td>
+                                            <td><?php echo $voucher['university_id']; ?></td>
                                             <td>
                                                 <?php
                                                 $voucher_months = explode(',', $voucher['months_applied']);
                                                 foreach ($voucher_months as $m) {
-                                                    echo "<span class='badge bg-primary me-1'>" . htmlspecialchars($m) . "</span>";
+                                                    echo "<span class='badge bg-primary me-1'>$m</span>";
                                                 }
                                                 ?>
                                             </td>
-                                            <td><?php echo htmlspecialchars($voucher['submission_date']); ?></td>
+                                            <td><?php echo $voucher['submission_date']; ?></td>
                                             <td>
                                                 <small>
-                                                    <strong>MAC:</strong> <?php echo htmlspecialchars($voucher['mac_address']); ?><br>
-                                                    <strong>IP:</strong> <?php echo htmlspecialchars($voucher['ip_address']); ?><br>
-                                                    <strong>Browser:</strong> <?php echo htmlspecialchars($device_info['browser'] ?? 'Unknown'); ?>
+                                                    <strong>MAC:</strong> <?php echo $voucher['mac_address']; ?><br>
+                                                    <strong>IP:</strong> <?php echo $voucher['ip_address']; ?><br>
+                                                    <strong>Browser:</strong>
+                                                    <?php echo $device_info['browser'] ?? 'Unknown'; ?>
                                                 </small>
                                             </td>
                                             <td>
                                                 <?php if (file_exists('uploads/' . $voucher['voucher_image'])): ?>
-                                                    <a href="uploads/<?php echo htmlspecialchars($voucher['voucher_image']); ?>" target="_blank" class="btn btn-sm btn-info">
+                                                    <a href="uploads/<?php echo $voucher['voucher_image']; ?>" target="_blank"
+                                                        class="btn btn-sm btn-info">
                                                         <i class="fas fa-eye"></i> View
                                                     </a>
                                                 <?php else: ?>
@@ -1239,18 +1095,22 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
                                                 <?php endif; ?>
                                             </td>
                                             <td>
-                                                <form method="POST">
-                                                    <input type="hidden" name="voucher_id" value="<?php echo $voucher['id']; ?>">
-                                                    <textarea name="admin_notes" class="form-control form-control-sm mb-2"
-                                                        placeholder="Add notes..." rows="2"></textarea>
-
-                                                    <div class="btn-group btn-group-sm">
+                                                <form method="POST" class="row g-2" onsubmit="return confirmVoucherAction(this)">
+                                                    <input type="hidden" name="voucher_id"
+                                                        value="<?php echo $voucher['id']; ?>">
+                                                    <div class="col-12">
+                                                        <textarea name="admin_notes" class="form-control form-control-sm"
+                                                            placeholder="Admin notes (optional)" rows="2"></textarea>
+                                                    </div>
+                                                    <div class="col-6">
                                                         <button type="submit" name="verify_voucher" value="approve"
-                                                            class="btn btn-success" onclick="return confirmVoucherAction(this)">
+                                                            class="btn btn-success btn-sm w-100">
                                                             <i class="fas fa-check"></i> Approve
                                                         </button>
+                                                    </div>
+                                                    <div class="col-6">
                                                         <button type="submit" name="verify_voucher" value="reject"
-                                                            class="btn btn-danger" onclick="return confirmVoucherAction(this)">
+                                                            class="btn btn-danger btn-sm w-100">
                                                             <i class="fas fa-times"></i> Reject
                                                         </button>
                                                     </div>
@@ -1288,15 +1148,16 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
                                 <tbody>
                                     <?php while ($voucher = $history_vouchers_result->fetch_assoc()): ?>
                                         <tr>
-                                            <td><?php echo htmlspecialchars($voucher['name']); ?></td>
-                                            <td><?php echo htmlspecialchars($voucher['months_applied']); ?></td>
+                                            <td><?php echo $voucher['name']; ?></td>
+                                            <td><?php echo $voucher['months_applied']; ?></td>
                                             <td>
-                                                <span class="badge <?php echo $voucher['status'] == 'approved' ? 'bg-success' : 'bg-danger'; ?>">
+                                                <span
+                                                    class="badge <?php echo $voucher['status'] == 'approved' ? 'bg-success' : 'bg-danger'; ?>">
                                                     <?php echo ucfirst($voucher['status']); ?>
                                                 </span>
                                             </td>
-                                            <td><?php echo htmlspecialchars($voucher['processed_date']); ?></td>
-                                            <td><small><?php echo htmlspecialchars($voucher['admin_notes'] ?: 'N/A'); ?></small></td>
+                                            <td><?php echo $voucher['processed_date']; ?></td>
+                                            <td><small><?php echo $voucher['admin_notes'] ?: 'N/A'; ?></small></td>
                                         </tr>
                                     <?php endwhile; ?>
                                 </tbody>
@@ -1326,20 +1187,21 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php
+                                    <?php 
                                     // Reset seats result pointer
                                     $seats_result->data_seek(0);
                                     while ($seat = $seats_result->fetch_assoc()): ?>
                                         <tr>
-                                            <td><strong><?php echo htmlspecialchars($seat['seat_number']); ?></strong></td>
-                                            <td><?php echo htmlspecialchars($seat['passenger_name']); ?></td>
-                                            <td><?php echo htmlspecialchars($seat['university_id']); ?></td>
+                                            <td><strong><?php echo $seat['seat_number']; ?></strong></td>
+                                            <td><?php echo $seat['passenger_name']; ?></td>
+                                            <td><?php echo $seat['university_id']; ?></td>
                                             <td>
-                                                <span class="badge <?php echo $seat['gender'] === 'male' ? 'bg-primary' : 'bg-pink'; ?>">
+                                                <span
+                                                    class="badge <?php echo $seat['gender'] === 'male' ? 'bg-primary' : 'bg-pink'; ?>">
                                                     <?php echo ucfirst($seat['gender']); ?>
                                                 </span>
                                             </td>
-                                            <td><?php echo htmlspecialchars($seat['booking_time']); ?></td>
+                                            <td><?php echo $seat['booking_time']; ?></td>
                                             <td>
                                                 <div class="btn-group btn-group-sm">
                                                     <a href="?remove_seat=<?php echo $seat['seat_number']; ?>"
@@ -1350,8 +1212,8 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
                                                     <button type="button" class="btn btn-warning" data-bs-toggle="modal"
                                                         data-bs-target="#replaceModal"
                                                         data-seat-number="<?php echo $seat['seat_number']; ?>"
-                                                        data-passenger-name="<?php echo htmlspecialchars($seat['passenger_name']); ?>"
-                                                        data-university-id="<?php echo htmlspecialchars($seat['university_id']); ?>"
+                                                        data-passenger-name="<?php echo $seat['passenger_name']; ?>"
+                                                        data-university-id="<?php echo $seat['university_id']; ?>"
                                                         data-gender="<?php echo $seat['gender']; ?>">
                                                         <i class="fas fa-exchange-alt"></i> Replace
                                                     </button>
@@ -1411,7 +1273,7 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
                                                                    name="selected_months[]" value="<?php echo $month['id']; ?>"
                                                                    id="month_<?php echo $month['id']; ?>">
                                                             <label class="form-check-label w-100" for="month_<?php echo $month['id']; ?>">
-                                                                <strong><?php echo htmlspecialchars($month['month_name']); ?></strong>
+                                                                <strong><?php echo $month['month_name']; ?></strong>
                                                             </label>
                                                         </div>
                                                         <select class="form-select form-select-sm mt-2" 
@@ -1489,7 +1351,7 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
                                             <?php foreach ($months as $index => $month): ?>
                                                 <div class="col-md-6 mb-2">
                                                     <div class="d-flex justify-content-between align-items-center p-2 border rounded">
-                                                        <span><?php echo htmlspecialchars($month['month_name']); ?></span>
+                                                        <span><?php echo $month['month_name']; ?></span>
                                                         <span class="badge bg-secondary">ID: <?php echo $month['id']; ?></span>
                                                     </div>
                                                 </div>
@@ -1498,6 +1360,133 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Delay Applications Tab -->
+            <div class="tab-pane fade" id="delay" role="tabpanel">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0"><i class="fas fa-clock"></i> Fee Delay Applications Management</h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Pending Delay Applications -->
+                        <h6 class="mb-3">Pending Delay Requests <span class="badge bg-danger"><?php 
+                            echo $delay_pending_count;
+                        ?></span></h6>
+
+                        <?php
+                        $pending_delays_sql = "SELECT * FROM fee_delay_applications WHERE status = 'pending' ORDER BY application_date ASC";
+                        $pending_delays_result = $conn->query($pending_delays_sql);
+                        ?>
+
+                        <div class="table-responsive mb-4">
+                            <table class="table table-striped">
+                                <thead class="table-warning">
+                                    <tr>
+                                        <th>Student Name</th>
+                                        <th>University ID</th>
+                                        <th>Months</th>
+                                        <th>Reason for Delay</th>
+                                        <th>Delay Period</th>
+                                        <th>Requested Days</th>
+                                        <th>Application Date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php 
+                                    if ($pending_delays_result && $pending_delays_result->num_rows > 0) {
+                                        while ($app = $pending_delays_result->fetch_assoc()): ?>
+                                            <tr>
+                                                <td><?php echo $app['student_name']; ?></td>
+                                                <td><?php echo $app['university_id']; ?></td>
+                                                <td>
+                                                    <?php
+                                                    $months_arr = explode(',', $app['months_applied']);
+                                                    foreach ($months_arr as $m) {
+                                                        echo "<span class='badge bg-primary me-1'>" . trim($m) . "</span>";
+                                                    }
+                                                    ?>
+                                                </td>
+                                                <td><small><?php echo $app['reason_for_delay']; ?></small></td>
+                                                <td><?php echo $app['delay_period']; ?></td>
+                                                <td><?php echo $app['requested_days']; ?></td>
+                                                <td><?php echo $app['application_date']; ?></td>
+                                                <td>
+                                                    <button type="button" class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#delayReviewModal"
+                                                        data-delay-id="<?php echo $app['id']; ?>"
+                                                        data-student-id="<?php echo $app['student_id']; ?>"
+                                                        data-student-name="<?php echo $app['student_name']; ?>"
+                                                        data-months-applied="<?php echo $app['months_applied']; ?>">
+                                                        <i class="fas fa-eye"></i> Review
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        <?php endwhile;
+                                    } else {
+                                        echo "<tr><td colspan='8' class='text-center text-muted'>No pending delay requests</td></tr>";
+                                    }
+                                    ?>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Processed Delay Applications -->
+                        <h6 class="mb-3">Processed Delay Requests</h6>
+                        <?php
+                        $processed_delays_sql = "SELECT * FROM fee_delay_applications WHERE status != 'pending' ORDER BY processed_date DESC LIMIT 100";
+                        $processed_delays_result = $conn->query($processed_delays_sql);
+                        ?>
+
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped">
+                                <thead class="table-secondary">
+                                    <tr>
+                                        <th>Student Name</th>
+                                        <th>University ID</th>
+                                        <th>Months</th>
+                                        <th>Reason</th>
+                                        <th>Status</th>
+                                        <th>Admin Notes</th>
+                                        <th>Processed Date</th>
+                                        <th>Processed By</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php 
+                                    if ($processed_delays_result && $processed_delays_result->num_rows > 0) {
+                                        while ($app = $processed_delays_result->fetch_assoc()):
+                                            $badge_class = '';
+                                            if ($app['status'] == 'approved') $badge_class = 'bg-success';
+                                            elseif ($app['status'] == 'disapproved') $badge_class = 'bg-danger';
+                                            elseif ($app['status'] == 'forwarded_to_transport') $badge_class = 'bg-primary';
+                                            elseif ($app['status'] == 'under_review') $badge_class = 'bg-info';
+                                            else $badge_class = 'bg-warning';
+                                            ?>
+                                            <tr>
+                                                <td><?php echo $app['student_name']; ?></td>
+                                                <td><?php echo $app['university_id']; ?></td>
+                                                <td><?php echo $app['months_applied']; ?></td>
+                                                <td><small><?php echo $app['reason_for_delay']; ?></small></td>
+                                                <td>
+                                                    <span class="badge <?php echo $badge_class; ?>">
+                                                        <?php echo ucfirst(str_replace('_', ' ', $app['status'])); ?>
+                                                    </span>
+                                                </td>
+                                                <td><small><?php echo $app['admin_notes'] ?: 'N/A'; ?></small></td>
+                                                <td><?php echo $app['processed_date'] ?: 'N/A'; ?></td>
+                                                <td><?php echo $app['admin_username'] ?: 'N/A'; ?></td>
+                                            </tr>
+                                        <?php endwhile;
+                                    } else {
+                                        echo "<tr><td colspan='8' class='text-center text-muted'>No processed delay requests yet</td></tr>";
+                                    }
+                                    ?>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -1573,7 +1562,7 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
                                                            name="bulk_selected_months[]" value="<?php echo $month['id']; ?>"
                                                            id="bulk_month_<?php echo $month['id']; ?>">
                                                     <label class="form-check-label" for="bulk_month_<?php echo $month['id']; ?>">
-                                                        <strong><?php echo htmlspecialchars($month['month_name']); ?></strong>
+                                                        <strong><?php echo $month['month_name']; ?></strong>
                                                     </label>
                                                 </div>
                                             </div>
@@ -1593,12 +1582,10 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
                         </div>
 
                         <div class="mt-3">
-                            <button type="button" class="btn btn-outline-primary btn-sm"
-                                onclick="selectAllBulkMonths(true)">
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="selectAllBulkMonths(true)">
                                 Select All Months
                             </button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm"
-                                onclick="selectAllBulkMonths(false)">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="selectAllBulkMonths(false)">
                                 Deselect All
                             </button>
                             <button type="button" class="btn btn-success btn-sm" onclick="setBulkAllFees('Submitted')">
@@ -1607,8 +1594,7 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
                             <button type="button" class="btn btn-warning btn-sm" onclick="setBulkAllFees('Pending')">
                                 Mark Selected as Pending
                             </button>
-                            <button type="button" class="btn btn-info btn-sm"
-                                onclick="setBulkAllFees('Pending Verification')">
+                            <button type="button" class="btn btn-info btn-sm" onclick="setBulkAllFees('Pending Verification')">
                                 Mark Selected as Pending Verification
                             </button>
                         </div>
@@ -1662,8 +1648,7 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
                             </select>
                         </div>
                         <div class="alert alert-info">
-                            <i class="fas fa-info-circle"></i> This will move the passenger from the current seat to the
-                            new selected seat.
+                            <i class="fas fa-info-circle"></i> This will move the passenger from the current seat to the new selected seat.
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -1677,8 +1662,8 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
         </div>
     </div>
 
-    <!-- Delay Action Modal -->
-    <div class="modal fade" id="delayActionModal" tabindex="-1">
+    <!-- Delay Review Modal -->
+    <div class="modal fade" id="delayReviewModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
@@ -1703,7 +1688,9 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
                             <select class="form-select" name="delay_action" required>
                                 <option value="">Select decision...</option>
                                 <option value="approved">Approve Delay</option>
-                                <option value="rejected">Reject Delay</option>
+                                <option value="disapproved">Disapprove Delay</option>
+                                <option value="forwarded_to_transport">Forward to Transport</option>
+                                <option value="under_review">Mark as Under Review</option>
                             </select>
                         </div>
                         <div class="mb-3">
@@ -1722,152 +1709,182 @@ $delay_pending_count = $delay_pending_result->fetch_assoc()['count'];
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            // Fee modal functionality
-            const feeModal = document.getElementById('feeModal');
-            if (feeModal) {
-                feeModal.addEventListener('show.bs.modal', function (event) {
-                    const button = event.relatedTarget;
-
-                    document.getElementById('modal_student_id').value = button.getAttribute('data-student-id');
-                    document.getElementById('modal_student_name').value = button.getAttribute('data-student-name');
-                    document.getElementById('modal_month_id').value = button.getAttribute('data-month-id');
-                    document.getElementById('modal_month_name').value = button.getAttribute('data-month-name');
-
-                    // Set current status in select
-                    const currentStatus = button.getAttribute('data-current-status');
-                    const statusSelect = document.querySelector('#feeModal select[name="status"]');
-                    if (statusSelect) {
-                        statusSelect.value = currentStatus;
-                    }
-                });
-            }
-
-            // Bulk fee modal functionality
-            const bulkFeeModal = document.getElementById('bulkFeeModal');
-            if (bulkFeeModal) {
-                bulkFeeModal.addEventListener('show.bs.modal', function (event) {
-                    const button = event.relatedTarget;
-
-                    const studentId = button.getAttribute('data-student-id');
-                    document.getElementById('bulk_student_id').value = studentId;
-                    document.getElementById('bulk_student_name').value = button.getAttribute('data-student-name');
-                });
-            }
-
-            // Replace seat modal functionality
-            const replaceModal = document.getElementById('replaceModal');
-            if (replaceModal) {
-                replaceModal.addEventListener('show.bs.modal', function (event) {
-                    const button = event.relatedTarget;
-
-                    const seatNumber = button.getAttribute('data-seat-number');
-                    const passengerName = button.getAttribute('data-passenger-name');
-                    const universityId = button.getAttribute('data-university-id');
-                    const gender = button.getAttribute('data-gender');
-
-                    document.getElementById('replace_old_seat').value = seatNumber;
-                    document.getElementById('replace_passenger_name').value = passengerName;
-                    document.getElementById('replace_university_id').value = universityId;
-                    document.getElementById('replace_gender').value = gender;
-                    document.getElementById('replace_current_seat').value = seatNumber;
-                    document.getElementById('replace_current_passenger').value = passengerName;
-                });
-            }
-
-            // Delay Review Modal
-            const delayReviewModal = document.getElementById('delayReviewModal');
-            if (delayReviewModal) {
-                delayReviewModal.addEventListener('show.bs.modal', function (event) {
-                    const button = event.relatedTarget;
-
-                    document.getElementById('modal_delay_id').value = button.getAttribute('data-delay-id');
-                    document.getElementById('modal_review_student_id').value = button.getAttribute('data-student-id');
-                    document.getElementById('modal_review_student_name').value = button.getAttribute('data-student-name');
-                    document.getElementById('modal_review_months').value = button.getAttribute('data-months-applied');
-                });
-            }
-
-            // Month management functions
-            function toggleMonthStatus(checkbox, statusId) {
-                const statusSelect = document.getElementById(statusId);
-                if (statusSelect) {
-                    statusSelect.disabled = !checkbox.checked;
-                }
-            }
-
-            window.selectAllMonths = function(selectAll) {
-                const checkboxes = document.querySelectorAll('input[name="selected_months[]"]');
-                checkboxes.forEach(checkbox => {
-                    checkbox.checked = selectAll;
-                    toggleMonthStatus(checkbox, 'status_' + checkbox.value);
-                });
-            };
-
-            window.setAllSelectedMonths = function(status) {
-                const checkboxes = document.querySelectorAll('input[name="selected_months[]"]:checked');
-                checkboxes.forEach(checkbox => {
-                    const statusSelect = document.getElementById('status_' + checkbox.value);
-                    if (statusSelect && !statusSelect.disabled) {
-                        statusSelect.value = status;
-                    }
-                });
-            };
-
-            window.selectAllBulkMonths = function(selectAll) {
-                const checkboxes = document.querySelectorAll('.bulk-month-check');
-                checkboxes.forEach(checkbox => {
-                    checkbox.checked = selectAll;
-                });
-            };
-
-            window.setBulkAllFees = function(status) {
-                const checkboxes = document.querySelectorAll('.bulk-month-check:checked');
-                checkboxes.forEach(checkbox => {
-                    const monthId = checkbox.value;
-                    const select = document.getElementById('bulk_status_' + monthId);
-                    if (select) {
-                        select.value = status;
-                    }
-                });
-            };
-
-            // Enable/disable month status when checkbox is clicked (Add Student tab)
-            document.querySelectorAll('.month-check').forEach(checkbox => {
-                checkbox.addEventListener('change', function () {
-                    const statusId = 'status_' + this.value;
-                    const statusSelect = document.getElementById(statusId);
-                    if (statusSelect) {
-                        statusSelect.disabled = !this.checked;
-                    }
+        // Fix for tab switching
+        document.addEventListener('DOMContentLoaded', function() {
+            // Handle tab clicks
+            document.querySelectorAll('#adminTabs .nav-link').forEach(function(tab) {
+                tab.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    // Remove active class from all tabs and panes
+                    document.querySelectorAll('#adminTabs .nav-link').forEach(function(t) {
+                        t.classList.remove('active');
+                    });
+                    document.querySelectorAll('.tab-pane').forEach(function(pane) {
+                        pane.classList.remove('active', 'show');
+                    });
+                    
+                    // Add active class to clicked tab
+                    this.classList.add('active');
+                    
+                    // Show corresponding pane
+                    const target = this.getAttribute('data-bs-target');
+                    document.querySelector(target).classList.add('active', 'show');
                 });
             });
-
-            // Confirm voucher action
-            window.confirmVoucherAction = function(button) {
-                const action = button.value;
-                const confirmMsg = action === 'approve'
-                    ? 'Are you sure you want to APPROVE this voucher? This will update fee status to "Submitted".'
-                    : 'Are you sure you want to REJECT this voucher?';
-
-                return confirm(confirmMsg);
-            };
-
-            // Logout confirmation
-            const logoutLink = document.querySelector('a[href="?logout"]');
-            if (logoutLink) {
-                logoutLink.addEventListener('click', function (e) {
-                    if (!confirm('Are you sure you want to logout?')) {
-                        e.preventDefault();
-                    }
-                });
-            }
         });
+
+        // Fee modal functionality
+        const feeModal = document.getElementById('feeModal');
+        if (feeModal) {
+            feeModal.addEventListener('show.bs.modal', function (event) {
+                const button = event.relatedTarget;
+
+                document.getElementById('modal_student_id').value = button.getAttribute('data-student-id');
+                document.getElementById('modal_student_name').value = button.getAttribute('data-student-name');
+                document.getElementById('modal_month_id').value = button.getAttribute('data-month-id');
+                document.getElementById('modal_month_name').value = button.getAttribute('data-month-name');
+
+                // Set current status in select
+                const currentStatus = button.getAttribute('data-current-status');
+                const statusSelect = document.querySelector('#feeModal select[name="status"]');
+                if (statusSelect) {
+                    statusSelect.value = currentStatus;
+                }
+            });
+        }
+
+        // Bulk fee modal functionality
+        const bulkFeeModal = document.getElementById('bulkFeeModal');
+        if (bulkFeeModal) {
+            bulkFeeModal.addEventListener('show.bs.modal', function (event) {
+                const button = event.relatedTarget;
+
+                const studentId = button.getAttribute('data-student-id');
+                document.getElementById('bulk_student_id').value = studentId;
+                document.getElementById('bulk_student_name').value = button.getAttribute('data-student-name');
+            });
+        }
+
+        // Replace seat modal functionality
+        const replaceModal = document.getElementById('replaceModal');
+        if (replaceModal) {
+            replaceModal.addEventListener('show.bs.modal', function (event) {
+                const button = event.relatedTarget;
+
+                const seatNumber = button.getAttribute('data-seat-number');
+                const passengerName = button.getAttribute('data-passenger-name');
+                const universityId = button.getAttribute('data-university-id');
+                const gender = button.getAttribute('data-gender');
+
+                document.getElementById('replace_old_seat').value = seatNumber;
+                document.getElementById('replace_passenger_name').value = passengerName;
+                document.getElementById('replace_university_id').value = universityId;
+                document.getElementById('replace_gender').value = gender;
+                document.getElementById('replace_current_seat').value = seatNumber;
+                document.getElementById('replace_current_passenger').value = passengerName;
+            });
+        }
+
+        // Delay Review Modal
+        const delayReviewModal = document.getElementById('delayReviewModal');
+        if (delayReviewModal) {
+            delayReviewModal.addEventListener('show.bs.modal', function (event) {
+                const button = event.relatedTarget;
+
+                document.getElementById('modal_delay_id').value = button.getAttribute('data-delay-id');
+                document.getElementById('modal_review_student_id').value = button.getAttribute('data-student-id');
+                document.getElementById('modal_review_student_name').value = button.getAttribute('data-student-name');
+                document.getElementById('modal_review_months').value = button.getAttribute('data-months-applied');
+            });
+        }
+
+        // Month management functions
+        function toggleMonthStatus(checkbox, statusId) {
+            const statusSelect = document.getElementById(statusId);
+            if (statusSelect) {
+                statusSelect.disabled = !checkbox.checked;
+            }
+        }
+
+        function selectAllMonths(selectAll) {
+            const checkboxes = document.querySelectorAll('input[name="selected_months[]"]');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = selectAll;
+                toggleMonthStatus(checkbox, 'status_' + checkbox.value);
+            });
+        }
+
+        function setAllSelectedMonths(status) {
+            const checkboxes = document.querySelectorAll('input[name="selected_months[]"]:checked');
+            checkboxes.forEach(checkbox => {
+                const statusSelect = document.getElementById('status_' + checkbox.value);
+                if (statusSelect && !statusSelect.disabled) {
+                    statusSelect.value = status;
+                }
+            });
+        }
+
+        function selectAllBulkMonths(selectAll) {
+            const checkboxes = document.querySelectorAll('.bulk-month-check');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = selectAll;
+            });
+        }
+
+        function setBulkAllFees(status) {
+            const checkboxes = document.querySelectorAll('.bulk-month-check:checked');
+            checkboxes.forEach(checkbox => {
+                const monthId = checkbox.value;
+                const select = document.getElementById('bulk_status_' + monthId);
+                if (select) {
+                    select.value = status;
+                }
+            });
+        }
+
+        // Enable/disable month status when checkbox is clicked (Add Student tab)
+        document.querySelectorAll('.month-check').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const statusId = 'status_' + this.value;
+                const statusSelect = document.getElementById(statusId);
+                if (statusSelect) {
+                    statusSelect.disabled = !this.checked;
+                }
+            });
+        });
+
+        // Confirm voucher action
+        function confirmVoucherAction(form) {
+            const action = form.querySelector('button[type="submit"]').value;
+            const confirmMsg = action === 'approve' 
+                ? 'Are you sure you want to APPROVE this voucher? This will update fee status to "Submitted".'
+                : 'Are you sure you want to REJECT this voucher?';
+            
+            return confirm(confirmMsg);
+        }
+
+        // Logout confirmation
+        const logoutLink = document.querySelector('a[href="?logout"]');
+        if (logoutLink) {
+            logoutLink.addEventListener('click', function (e) {
+                if (!confirm('Are you sure you want to logout?')) {
+                    e.preventDefault();
+                }
+            });
+        }
     </script>
 </body>
 
 </html>
 
 <?php
+// Handle logout
+if (isset($_GET['logout'])) {
+    session_destroy();
+    header('Location: admin.php');
+    exit;
+}
+
 $conn->close();
 ?>
